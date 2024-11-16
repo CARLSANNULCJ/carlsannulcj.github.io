@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"> 
+        <link rel="stylesheet" href="Card.css">
+        <title></title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+*{
+margin:0;  
+padding:0;
+box-sizing:border-box;
+}  
+
+body{
+background:#FEF9F3; 
+font-family: 'Montserrat', sans-serif;
+background: url('https://i.ibb.co/NjnnvJG/RDT-20240714-2134026736533551468166395.png') no-repeat center fixed;
+  background-size: cover;;
+
+}
+
+.container{
+height:480px;    
+width:285px;
+background:black;
+border-radius:10px;
+position:absolute;
+top:50%;
+left:50%;
+transform:translate(-50%,-50%);
+overflow:hidden;
+transition:all .2s;
+cursor:pointer;
+}
+
+.container img{
+border-radius:10px;  
+height:100%;
+width:100%;
+transition:all .2s;
+cursor:pointer;
+}
+
+.bg-img:hover{
+transform:scale(1.4);  
+transition:all .2s;
+}
+
+.container .info{
+width:100%;
+background:linear-gradient(to top,#000 70%,transparent);
+position:absolute;
+bottom:-160px;
+transition:all 1050.2s;
+color:white;
+padding:18px;
+padding-right:10px;
+}
+
+.bg-img:hover ~ .info{
+bottom:0;  
+transition:all .2s;
+}
+
+.container .top-bg{
+height:50px;
+width:100%;
+background:linear-gradient(to bottom, #000 4%, transparent);
+position:absolute;
+top:0px;
+transition:all .2s;      
+}
+
+.container .info .movie-name{
+margin-top:25px;  
+font-size:16px;
+}
+
+.container .info .oth-detail{
+font-size:9px; 
+margin-top:10px;
+letter-spacing:1px;
+}
+
+.container .info .description{
+font-size:11px;
+color:grey;
+margin-top:20px;
+color:white;
+font-weight:300;
+}
+
+.container .info .stars{
+margin-top:7px;  
+font-size:10px;
+}
+
+.container .info .stars i{
+margin-left:5px;   
+position:relative;
+left:-5px;
+}
+
+.container .info .stars .rating{
+color:#F3C23F;        
+  }
+  
+  .trailer{
+  background: transparent;
+  color: #f1c40f;
+  border: 2px solid #f1c40f;
+  padding: 7px 10px;
+  border-radius: 5px;
+  transition: 0.2s ease;
+}
+
+</style>        
+</head>
+
+<body>
+<div class="container">
+  <img src="https://i.ibb.co/xSRdFpB/Background3.jpg" class="bg-img"> 
+   <div class="top-bg"></div>   
+   <br>   
+  <div class="info">
+     <h3 class="movie-name">Avengers - Endgame</h3>  
+     <p class="oth-detail">12  |   3h 1min  |  Action,Adventure,Drama  |  2019</p>
+     <p class="description">After the devastating events of Infinity War(2018) the universe is it ruins. With the help of remaining allies. the Avengers assemble once more in order to reverse Thanos'actions and restore balance to the universe</p>
+     <div class="stars">
+        <i class="fa-solid fa-star rating"></i>
+        <i class="fa-solid fa-star rating"></i>
+        <i class="fa-solid fa-star rating"></i>
+        <i class="fa-solid fa-star rating"></i>
+        <i class="fa-regular fa-star"></i>
+     </div>
+     
+     <br>
+        <a href="https://t.me/c/2018325051/286">
+      <button class="trailer"> <i class="fas fa-play"></i> 1080P ︎ ︎  ︎ ︎</button></a>
+      
+        <a href="https://t.me/c/2018325051/286">
+      <button class="trailer"> <i class="fas fa-play"></i> 4K ︎ ︎ ︎  ︎ ︎  ︎ ︎</button></a>
+      
+        <a href="https://t.me/c/2018325051/286">
+      <button class="trailer"> <i class="fas fa-play"></i> 3D ︎ ︎ ︎  ︎ ︎  ︎ ︎</button></a>
+      
+      
+ 
+  </div>
+</div>
+</body>
+
+</html>
