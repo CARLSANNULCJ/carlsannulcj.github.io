@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyBlog</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* View switching */
+        .view { display: none; }
+        .view.active { display: block; }
+
+        /* Custom file input button */
+        .file-input-button {
+            background-color: #334155;
+            color: #f1f5f9;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            border: 1px solid #475569;
+            transition: background-color 0.2s;
+        }
+        .file-input-button:hover { background-color: #475569; }
+        input[type="file"] { display: none; }
+
+        /* Modal styles */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 1000; opacity: 0; visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+        .modal-content {
+            background-color: #1e293b; color: #cbd5e1;
+            padding: 2rem; border-radius: 0.75rem; border: 1px solid #334155;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            transform: scale(0.95); transition: transform 0.3s;
+        }
+        .modal-overlay.active .modal-content { transform: scale(1); }
+        .post-card { cursor: pointer; }
+
+        /* Rich text editor styles */
+        #post-content-editor {
+            min-height: 150px;
+            cursor: text;
+        }
+        #post-content-editor:focus {
+            outline: none;
+            border-color: #0ea5e9; /* sky-500 */
+            box-shadow: 0 0 0 1px #0ea5e9;
+        }
+        #post-content-editor img, .post-detail-body img {
+            max-width: 100%;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            cursor: pointer; /* Add cursor to indicate it's clickable */
+        }
+        
+        /* Notification Bar Styles */
+        #notification-bar {
+            position: fixed;
+            top: 1.25rem;
+            right: 1.25rem;
+            z-index: 2000;
+            transform: translateX(calc(100% + 1.25rem));
+            transition: transform 0.3s ease-in-out;
+        }
+        #notification-bar.show {
+            transform: translateX(0);
+        }
+        .loader {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 5px solid #475569;
+            border-top-color: #f1f5f9;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-300">
+
+    <div id="app" class="container mx-auto p-4 sm:p-6 lg:p-8">
+
+        <!-- Header -->
+        <header class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-8 pb-4 border-b border-slate-700">
+            <h1 class="text-3xl sm:text-4xl font-bold text-slate-100 tracking-tight">MyBlog</h1>
+             <!-- Search Bar -->
+            <div class="w-full sm:w-1/2 md:w-1/3">
+                <label for="search-input" class="sr-only">Search Posts</label>
+                <input type="search" id="search-input" placeholder="Search by title or content..." class="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-colors">
+            </div>
+            <nav>
+                <button id="home-btn" class="text-lg font-medium text-white">Home</button>
+                <button id="dashboard-btn" class="ml-4 text-lg font-medium text-slate-400 hover:text-white">Dashboard</button>
+            </nav>
+        </header>
+
+        <!-- Main Blog View -->
+        <main id="blog-view" class="view active">
+            <div id="posts-container" class="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+                <div class="loader-container col-span-full flex justify-center items-center h-64">
+                    <div class="loader"></div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Dashboard View -->
+        <section id="dashboard-view" class="view">
+             <div class="max-w-2xl mx-auto bg-slate-800 p-8 rounded-xl shadow-lg border border-slate-700">
+                <h2 id="form-title" class="text-3xl font-bold mb-6 text-center text-slate-100">Create a New Post</h2>
+                <form id="create-post-form">
+                    <input type="hidden" id="post-id" name="post-id">
+                    <div class="mb-6">
+                        <label for="post-title" class="block text-sm font-medium text-slate-400 mb-2">Post Title</label>
+                        <input type="text" id="post-title" name="post-title" class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:ring-sky-500 focus:border-sky-500" required>
+                    </div>
+                     <div class="mb-6">
+                        <label class="block text-sm font-medium text-slate-400 mb-2">Main Post Image</label>
+                        <label for="post-image" class="file-input-button">Choose Main Image</label>
+                        <input type="file" id="post-image" name="post-image" accept="image/*">
+                        <span id="file-name" class="ml-4 text-sm text-slate-500">No file chosen</span>
+                        <p id="image-hint" class="text-xs text-slate-500 mt-1 hidden">Leave blank to keep the current image.</p>
+                    </div>
+                    <div id="image-preview-container" class="mb-6 hidden">
+                        <p class="block text-sm font-medium text-slate-400 mb-2">Main Image Preview</p>
+                        <img id="image-preview" src="#" alt="Image Preview" class="mt-2 rounded-lg max-h-60 w-auto mx-auto shadow-md"/>
+                    </div>
+                    <div class="mb-6">
+                        <div class="flex justify-between items-center mb-2">
+                             <label for="post-content-editor" class="block text-sm font-medium text-slate-400">Post Content</label>
+                             <div>
+                                <button type="button" id="insert-image-btn" class="file-input-button text-xs">Insert Image into Content</button>
+                                <input type="file" id="image-inserter" accept="image/*">
+                             </div>
+                        </div>
+                        <div id="post-content-editor" contenteditable="true" class="w-full p-4 bg-slate-700 border border-slate-600 rounded-lg text-slate-200"></div>
+                    </div>
+                    <div id="error-message" class="text-red-400 text-sm mb-4 hidden"></div>
+                    <button type="submit" id="submit-btn" class="w-full bg-sky-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors duration-300">Publish Post</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- Post Detail View -->
+        <section id="post-detail-view" class="view">
+            <button id="back-to-blog-btn" class="mb-8 text-sky-400 hover:text-sky-300 font-medium">&larr; Back to Blog</button>
+            <div id="post-detail-content" class="max-w-4xl mx-auto">
+                <!-- Individual post content will be injected here -->
+            </div>
+        </section>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-modal" class="modal-overlay">
+        <div class="modal-content text-center">
+            <h3 class="text-xl font-bold text-slate-100 mb-4">Confirm Deletion</h3>
+            <p class="text-slate-400 mb-6">Are you sure you want to delete this post?</p>
+            <div class="flex justify-center gap-4">
+                <button id="cancel-delete-btn" class="px-6 py-2 bg-slate-600 text-slate-100 rounded-lg hover:bg-slate-500">Cancel</button>
+                <button id="confirm-delete-btn" class="px-6 py-2 bg-red-700 text-white rounded-lg hover:bg-red-600">Delete</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Notification Bar -->
+    <div id="notification-bar" class="py-2 px-4 rounded-lg shadow-lg text-white">
+        Notification message
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            onSnapshot, 
+            query, 
+            orderBy, 
+            serverTimestamp,
+            doc,
+            getDoc,
+            updateDoc,
+            deleteDoc
+        } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        // --- YOUR FIREBASE CONFIGURATION ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyAaWzo1MHpSg6REflLh7DTQy6mI9JuH-pM",
+            authDomain: "blog-e27b7.firebaseapp.com",
+            projectId: "blog-e27b7",
+            storageBucket: "blog-e27b7.appspot.com", // Corrected storage bucket format
+            messagingSenderId: "1085460097203",
+            appId: "1:1085460097203:web:0467a99b169fa86487e8c6",
+            measurementId: "G-DCHB6VVC4V"
+        };
+        // ---------------------------------------------------------
+
+        // --- DOM ELEMENTS ---
+        const postsContainer = document.getElementById('posts-container');
+
+        /**
+         * Main function to initialize the entire application logic after config check.
+         */
+        function initializeAppLogic() {
+            // Initialize Firebase
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const db = getFirestore(app);
+
+            // --- STATE MANAGEMENT ---
+            let posts = []; // This will be populated by Firestore
+            let postToDeleteId = null;
+            let imageToReplace = null;
+            let currentUnsubscribe = null; // To manage Firestore listener
+
+            // --- DOM ELEMENTS (get remaining elements) ---
+            const blogView = document.getElementById('blog-view');
+            const dashboardView = document.getElementById('dashboard-view');
+            const postDetailView = document.getElementById('post-detail-view');
+            const homeBtn = document.getElementById('home-btn');
+            const dashboardBtn = document.getElementById('dashboard-btn');
+            const backToBlogBtn = document.getElementById('back-to-blog-btn');
+            const searchInput = document.getElementById('search-input');
+            const postDetailContent = document.getElementById('post-detail-content');
+            const createPostForm = document.getElementById('create-post-form');
+            const postContentEditor = document.getElementById('post-content-editor');
+            const insertImageBtn = document.getElementById('insert-image-btn');
+            const imageInserterInput = document.getElementById('image-inserter');
+            const postImageInput = document.getElementById('post-image');
+            const fileNameSpan = document.getElementById('file-name');
+            const imagePreviewContainer = document.getElementById('image-preview-container');
+            const imagePreview = document.getElementById('image-preview');
+            const errorMessage = document.getElementById('error-message');
+            const formTitle = document.getElementById('form-title');
+            const submitBtn = document.getElementById('submit-btn');
+            const postIdInput = document.getElementById('post-id');
+            const imageHint = document.getElementById('image-hint');
+            const notificationBar = document.getElementById('notification-bar');
+            const deleteModal = document.getElementById('delete-modal');
+            const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+            const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+
+            // --- FUNCTIONS ---
+
+            const showNotification = (message, isError = false) => {
+                notificationBar.textContent = message;
+                notificationBar.classList.remove('bg-green-500', 'bg-red-500');
+                notificationBar.classList.add(isError ? 'bg-red-500' : 'bg-green-500');
+                notificationBar.classList.add('show');
+                setTimeout(() => {
+                    notificationBar.classList.remove('show');
+                }, 3000);
+            };
+
+            const renderPosts = (searchQuery = '') => {
+                postsContainer.innerHTML = '';
+
+                const lowerCaseQuery = searchQuery.toLowerCase().trim();
+                const filteredPosts = posts.filter(post => 
+                    post.title.toLowerCase().includes(lowerCaseQuery) || 
+                    post.content.toLowerCase().includes(lowerCaseQuery)
+                );
+
+                if (filteredPosts.length === 0) {
+                     if (searchQuery) {
+                        postsContainer.innerHTML = `<p class="text-slate-400 col-span-full text-center py-8">No posts found matching your search.</p>`;
+                    } else {
+                         postsContainer.innerHTML = `
+                            <div class="bg-slate-800 rounded-lg shadow-md overflow-hidden border border-slate-700 col-span-full">
+                                <img src="https://placehold.co/600x400/1e293b/94a3b8?text=Welcome" alt="Blog Post Image" class="w-full h-48 object-cover">
+                                <div class="p-6">
+                                    <h2 class="text-2xl font-bold mb-2 text-slate-100">Welcome to the Blog!</h2>
+                                    <p class="text-slate-400">Create your first post from the dashboard.</p>
+                                </div>
+                            </div>`;
+                    }
+                    return;
+                }
+
+                filteredPosts.forEach(post => {
+                    const postElement = document.createElement('div');
+                    postElement.className = 'post-card bg-slate-800 rounded-lg shadow-md overflow-hidden flex flex-col border border-slate-700 transform hover:-translate-y-1 transition-transform duration-300';
+                    postElement.dataset.id = post.id;
+                    const thumbnailUrl = post.mainImage || `https://placehold.co/600x400/1e293b/94a3b8?text=${encodeURIComponent(post.title)}`;
+
+                    postElement.innerHTML = `
+                        <div class="pointer-events-none">
+                            <img src="${thumbnailUrl}" alt="${post.title}" class="w-full h-48 object-cover" onerror="this.onerror=null;this.src='https://placehold.co/600x400/fee2e2/b91c1c?text=Image+Error';">
+                            <div class="p-6 flex-grow">
+                                <h2 class="text-2xl font-bold text-slate-100">${post.title}</h2>
+                            </div>
+                        </div>
+                        <div class="p-4 bg-slate-800/50 border-t border-slate-700 flex justify-end gap-2 mt-auto">
+                            <button data-id="${post.id}" class="edit-btn flex items-center gap-1.5 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 px-3 py-1.5 rounded-md transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                                Edit
+                            </button>
+                            <button data-id="${post.id}" class="delete-btn flex items-center gap-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-md transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                                Delete
+                            </button>
+                        </div>
+                    `;
+                    postsContainer.appendChild(postElement);
+                });
+            };
+
+            const renderPostDetail = async (id) => {
+                try {
+                    const postRef = doc(db, 'posts', id);
+                    const postSnap = await getDoc(postRef);
+
+                    if (postSnap.exists()) {
+                        const post = postSnap.data();
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = post.content;
+                        const sanitizedContent = tempDiv.innerHTML.replace(
+                            /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])|(\bwww\.[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig,
+                            function(url) {
+                                const href = url.startsWith('www.') ? 'http://' + url : url;
+                                return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="text-sky-400 hover:text-sky-300 underline">${url}</a>`;
+                            }
+                        );
+
+                        postDetailContent.innerHTML = `
+                            <h1 class="text-4xl md:text-5xl font-bold text-slate-100 mb-4">${post.title}</h1>
+                            <img src="${post.mainImage}" alt="${post.title}" class="w-full rounded-lg shadow-lg mb-8 max-h-[500px] object-cover" onerror="this.onerror=null;this.src='https://placehold.co/1200x500/fee2e2/b91c1c?text=Image+Error';">
+                            <div class="post-detail-body prose prose-invert prose-lg max-w-none text-slate-300 whitespace-pre-wrap">
+                                ${sanitizedContent}
+                            </div>
+                        `;
+                        switchView('post-detail-view');
+                    } else {
+                        showNotification("Post not found.", true);
+                    }
+                } catch (error) {
+                    console.error("Error fetching post:", error);
+                    showNotification("Error fetching post.", true);
+                }
+            };
+
+            const resetForm = () => {
+                createPostForm.reset();
+                postContentEditor.innerHTML = '';
+                formTitle.textContent = 'Create a New Post';
+                submitBtn.textContent = 'Publish Post';
+                postIdInput.value = '';
+                fileNameSpan.textContent = 'No file chosen';
+                imagePreviewContainer.classList.add('hidden');
+                imageHint.classList.add('hidden');
+                postImageInput.required = true;
+            };
+
+            const switchView = (viewToShow) => {
+                [blogView, dashboardView, postDetailView].forEach(v => v.classList.remove('active'));
+
+                if (viewToShow === 'blog-view') {
+                    blogView.classList.add('active');
+                    homeBtn.classList.add('text-white');
+                    homeBtn.classList.remove('text-slate-400', 'hover:text-white');
+                    dashboardBtn.classList.add('text-slate-400', 'hover:text-white');
+                    dashboardBtn.classList.remove('text-white');
+                    resetForm();
+                    searchInput.value = '';
+                    renderPosts();
+                } else if (viewToShow === 'dashboard-view') {
+                    dashboardView.classList.add('active');
+                    dashboardBtn.classList.add('text-white');
+                    dashboardBtn.classList.remove('text-slate-400', 'hover:text-white');
+                    homeBtn.classList.add('text-slate-400', 'hover:text-white');
+                    homeBtn.classList.remove('text-white');
+                } else if (viewToShow === 'post-detail-view') {
+                    postDetailView.classList.add('active');
+                }
+            };
+
+            const resizeImage = (file, maxWidth, maxHeight, quality) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(file);
+                    reader.onload = (event) => {
+                        const img = new Image();
+                        img.src = event.target.result;
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            let width = img.width;
+                            let height = img.height;
+
+                            if (width > height) {
+                                if (width > maxWidth) {
+                                    height *= maxWidth / width;
+                                    width = maxWidth;
+                                }
+                            } else {
+                                if (height > maxHeight) {
+                                    width *= maxHeight / height;
+                                    height = maxHeight;
+                                }
+                            }
+
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, width, height);
+                            resolve(canvas.toDataURL('image/jpeg', quality));
+                        };
+                        img.onerror = (error) => reject(error);
+                    };
+                    reader.onerror = (error) => reject(error);
+                });
+            };
+            
+            const handleFormSubmit = async (e) => {
+                e.preventDefault();
+                errorMessage.classList.add('hidden');
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Publishing...';
+
+                const id = postIdInput.value;
+                const title = document.getElementById('post-title').value.trim();
+                const content = postContentEditor.innerHTML.trim();
+                const mainImageFile = postImageInput.files[0];
+
+                if (!title || !content) {
+                    errorMessage.textContent = 'Title and content are required.';
+                    errorMessage.classList.remove('hidden');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = id ? 'Update Post' : 'Publish Post';
+                    return;
+                }
+                
+                const processPost = async (mainImageUrl) => {
+                    try {
+                        if (id) { // Editing existing post
+                            const postRef = doc(db, 'posts', id);
+                            const postData = { title, content };
+                            if (mainImageUrl) {
+                                postData.mainImage = mainImageUrl;
+                            }
+                            await updateDoc(postRef, postData);
+                            showNotification("Post updated successfully!");
+                        } else { // Creating new post
+                            await addDoc(collection(db, 'posts'), {
+                                title,
+                                content,
+                                mainImage: mainImageUrl,
+                                createdAt: serverTimestamp()
+                            });
+                            showNotification("Post created successfully!");
+                        }
+                        switchView('blog-view');
+                    } catch (error) {
+                        console.error("Error saving post:", error);
+                        showNotification("Error saving post.", true);
+                    } finally {
+                        submitBtn.disabled = false;
+                        resetForm();
+                    }
+                };
+
+                if (mainImageFile) {
+                    try {
+                        const resizedImage = await resizeImage(mainImageFile, 1920, 1080, 0.7);
+                        processPost(resizedImage);
+                    } catch (error) {
+                        console.error("Error resizing main image:", error);
+                        showNotification("Could not process main image.", true);
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = id ? 'Update Post' : 'Publish Post';
+                    }
+                } else {
+                    if (id) {
+                        const existingPost = posts.find(p => p.id == id);
+                        processPost(existingPost.mainImage);
+                    } else {
+                        errorMessage.textContent = 'A main image is required for new posts.';
+                        errorMessage.classList.remove('hidden');
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Publish Post';
+                    }
+                }
+            };
+            
+            const handleEditClick = async (id) => {
+                try {
+                    const postRef = doc(db, 'posts', id);
+                    const postSnap = await getDoc(postRef);
+
+                    if (postSnap.exists()) {
+                        const post = postSnap.data();
+                        switchView('dashboard-view');
+                        formTitle.textContent = 'Edit Post';
+                        submitBtn.textContent = 'Update Post';
+                        postIdInput.value = postSnap.id;
+                        document.getElementById('post-title').value = post.title;
+                        postContentEditor.innerHTML = post.content;
+                        
+                        imagePreview.src = post.mainImage;
+                        imagePreviewContainer.classList.remove('hidden');
+                        imageHint.classList.remove('hidden');
+                        postImageInput.required = false;
+                    }
+                } catch (error) {
+                    console.error("Error preparing edit:", error);
+                    showNotification("Could not load post for editing.", true);
+                }
+            };
+
+            const handleDeleteClick = (id) => {
+                postToDeleteId = id;
+                deleteModal.classList.add('active');
+            };
+
+            const confirmDelete = async () => {
+                if (postToDeleteId) {
+                    try {
+                        await deleteDoc(doc(db, 'posts', postToDeleteId));
+                        showNotification("Post deleted successfully.");
+                    } catch (error) {
+                        console.error("Error deleting post:", error);
+                        showNotification("Error deleting post.", true);
+                    } finally {
+                        postToDeleteId = null;
+                        deleteModal.classList.remove('active');
+                    }
+                }
+            };
+
+            const listenForPosts = () => {
+                const postsRef = collection(db, 'posts');
+                const q = query(postsRef, orderBy('createdAt', 'desc'));
+
+                if (currentUnsubscribe) {
+                    currentUnsubscribe();
+                }
+
+                currentUnsubscribe = onSnapshot(q, (snapshot) => {
+                    posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    renderPosts(searchInput.value);
+                }, (error) => {
+                    console.error("Error listening for posts:", error);
+                    showNotification("Could not fetch posts from the database.", true);
+                    postsContainer.innerHTML = `<p class="text-red-400 text-center col-span-full">Error loading posts. Check console and Firebase setup.</p>`;
+                });
+            };
+
+            // --- EVENT LISTENERS ---
+            homeBtn.addEventListener('click', () => switchView('blog-view'));
+            dashboardBtn.addEventListener('click', () => {
+                resetForm();
+                switchView('dashboard-view');
+            });
+            backToBlogBtn.addEventListener('click', () => switchView('blog-view'));
+            createPostForm.addEventListener('submit', handleFormSubmit);
+
+            searchInput.addEventListener('input', (e) => renderPosts(e.target.value));
+
+            postImageInput.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    fileNameSpan.textContent = file.name;
+                    try {
+                        const resizedImage = await resizeImage(file, 800, 800, 0.7);
+                        imagePreview.src = resizedImage;
+                        imagePreviewContainer.classList.remove('hidden');
+                    } catch (error) {
+                        showNotification("Could not preview image.", true);
+                    }
+                } else {
+                    fileNameSpan.textContent = 'No file chosen';
+                    if(!postIdInput.value) {
+                        imagePreviewContainer.classList.add('hidden');
+                    }
+                }
+            });
+
+            insertImageBtn.addEventListener('click', () => {
+                imageToReplace = null;
+                imageInserterInput.click();
+            });
+            
+            postContentEditor.addEventListener('click', (e) => {
+                if (e.target.tagName === 'IMG') {
+                    imageToReplace = e.target;
+                    imageInserterInput.click();
+                }
+            });
+            
+            postContentEditor.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+                document.execCommand('insertText', false, text);
+            });
+
+            imageInserterInput.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                try {
+                    const resizedImage = await resizeImage(file, 1200, 1200, 0.7);
+                    if (imageToReplace) {
+                        imageToReplace.src = resizedImage;
+                        imageToReplace = null;
+                    } else {
+                        const img = document.createElement('img');
+                        img.src = resizedImage;
+                        img.alt = "User uploaded image";
+                        img.className = "my-4 rounded-lg shadow-md w-full max-w-lg mx-auto block";
+                        postContentEditor.focus();
+                        document.execCommand('insertHTML', false, img.outerHTML);
+                    }
+                } catch (error) {
+                    showNotification("Could not insert image.", true);
+                }
+                e.target.value = '';
+            });
+
+            postsContainer.addEventListener('click', (e) => {
+                const card = e.target.closest('.post-card');
+                if (!card) return;
+
+                const id = card.dataset.id;
+                if (e.target.closest('.edit-btn')) {
+                    handleEditClick(id);
+                } else if (e.target.closest('.delete-btn')) {
+                    handleDeleteClick(id);
+                } else {
+                    renderPostDetail(id);
+                }
+            });
+
+            cancelDeleteBtn.addEventListener('click', () => {
+                postToDeleteId = null;
+                deleteModal.classList.remove('active');
+            });
+
+            confirmDeleteBtn.addEventListener('click', confirmDelete);
+
+            // --- INITIALIZATION ---
+            signInAnonymously(auth)
+                .then(() => {
+                    console.log("Signed in anonymously.");
+                    listenForPosts();
+                })
+                .catch((error) => {
+                    console.error("Anonymous sign-in failed:", error);
+                    let userMessage = "Authentication failed. Check console and Firebase setup.";
+                    if (error.code === 'auth/configuration-not-found') {
+                        userMessage = `
+                            <div class="col-span-full text-center p-8 bg-red-900/20 border border-red-500 rounded-lg">
+                                <h2 class="text-2xl font-bold text-red-400 mb-4">Authentication Method Not Enabled!</h2>
+                                <p class="text-slate-300">To fix this, go to your Firebase project console:</p>
+                                <ol class="text-slate-400 mt-2 list-decimal list-inside text-left max-w-md mx-auto">
+                                    <li>Go to the <strong>Authentication</strong> section.</li>
+                                    <li>Click on the <strong>Sign-in method</strong> tab.</li>
+                                    <li>Find <strong>Anonymous</strong> in the list and enable it.</li>
+                                </ol>
+                            </div>
+                        `;
+                        postsContainer.innerHTML = userMessage;
+                    } else {
+                        showNotification("Could not connect to the database.", true);
+                        postsContainer.innerHTML = `<p class="text-red-400 text-center col-span-full">${userMessage}</p>`;
+                    }
+                });
+        }
+
+        // --- CONFIGURATION CHECK ---
+        if (firebaseConfig.apiKey === "YOUR_API_KEY" || !firebaseConfig.projectId) {
+            postsContainer.innerHTML = `
+                <div class="col-span-full text-center p-8 bg-red-900/20 border border-red-500 rounded-lg">
+                    <h2 class="text-2xl font-bold text-red-400 mb-4">Firebase Configuration Missing!</h2>
+                    <p class="text-slate-300">To get started, you need to set up a free Firebase project and paste your configuration details into the code.</p>
+                    <p class="text-slate-400 mt-2">Replace the placeholder <code class="bg-slate-700 p-1 rounded">firebaseConfig</code> object in the HTML file with the one from your Firebase project settings.</p>
+                </div>
+            `;
+        } else {
+            initializeAppLogic();
+        }
+    </script>
+</body>
+</html>
