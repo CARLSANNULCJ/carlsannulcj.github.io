@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>VR Web Player</title>
+    <!-- Three.js for 3D rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Three.js Controls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/DeviceOrientationControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Google Fonts for modern typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --accent-color: #00d9ff;
+            --background-color: #05080d;
+            --ui-background: rgba(10, 20, 35, 0.7);
+            --text-color: #e0e0e0;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            font-family: 'Poppins', sans-serif;
+        }
+        
+        /* Animated Starfield Background */
+        .starfield {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(1px 1px at 20px 30px, #eee, transparent),
+                radial-gradient(1px 1px at 40px 70px, #fff, transparent),
+                radial-gradient(1px 1px at 50px 160px, #ddd, transparent),
+                radial-gradient(1px 1px at 90px 40px, #fff, transparent),
+                radial-gradient(1.5px 1.5px at 130px 80px, #fff, transparent),
+                radial-gradient(1px 1px at 160px 120px, #ddd, transparent);
+            background-repeat: repeat;
+            background-size: 200px 200px;
+            animation: zoom 120s infinite;
+            opacity: 0.3;
+        }
+
+        @keyframes zoom {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.5); }
+        }
+
+        #vr-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        canvas { display: block; width: 100%; height: 100%; }
+        video, img { display: none; }
+        
+        /* Main Controls Container */
+        #controls {
+            z-index: 100;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            padding: 1rem;
+            background: var(--ui-background);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(0, 217, 255, 0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            transition: opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
+        }
+        
+        .controls-hidden {
+            opacity: 0;
+            transform: translateY(100%);
+            pointer-events: none;
+        }
+        
+        .control-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        /* Buttons Styling */
+        .control-btn, .file-input-label {
+            background: transparent;
+            border: none;
+            color: var(--text-color);
+            padding: 0.5rem;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: color 0.2s, box-shadow 0.2s, background-color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .control-btn svg, .file-input-label svg {
+            width: 1.5rem;
+            height: 1.5rem;
+        }
+        .control-btn:hover, .file-input-label:hover {
+            color: var(--accent-color);
+            box-shadow: 0 0 15px var(--accent-color);
+        }
+        .control-btn.active {
+            background-color: var(--accent-color);
+            color: black;
+        }
+        
+        .text-btn {
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            font-weight: 600;
+        }
+        .text-btn.active {
+            background-color: var(--accent-color);
+            color: black;
+            box-shadow: 0 0 15px var(--accent-color);
+        }
+
+        .mode-group {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 4px;
+            display: flex;
+        }
+
+        .mode-group .text-btn {
+            border-radius: 8px;
+            padding: 0.3rem 0.8rem;
+            box-shadow: none;
+        }
+         .mode-group .text-btn:hover {
+            background-color: rgba(255,255,255,0.1);
+            color: white;
+         }
+
+        .mode-group .text-btn.active {
+            background: var(--accent-color);
+            color: black;
+        }
+        
+        /* Sliders */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+            cursor: pointer;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            background: rgba(0, 0, 0, 0.4);
+            height: 0.5rem;
+            border-radius: 0.5rem;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none;
+            margin-top: -4px;
+            background-color: var(--accent-color);
+            height: 1rem; width: 1rem;
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--accent-color);
+        }
+        #seek-bar { flex-grow: 1; max-width: 600px; }
+        #volume-slider { max-width: 100px; }
+        
+        .time-display { font-family: monospace; font-size: 0.9rem; }
+        
+        /* Welcome & Error & Adjustment Panel */
+        .overlay {
+            position: absolute; z-index: 50;
+            display: flex; align-items: center; justify-content: center;
+            padding: 2rem; text-align: center;
+        }
+        #welcome-message {
+             inset: 0; flex-direction: column;
+             background: rgba(10, 20, 35, 0.8);
+             backdrop-filter: blur(10px);
+        }
+        #error-message {
+            top: 2rem; left: 50%; transform: translateX(-50%);
+            background: #c51435; border-radius: 10px;
+            transition: opacity 0.3s; opacity: 0; pointer-events: none;
+        }
+        #adjustments-panel {
+            inset: 0; background: rgba(10, 20, 35, 0.8);
+            backdrop-filter: blur(10px); display: none;
+            flex-direction: column; gap: 1rem;
+        }
+        .adjustment-row { display: flex; align-items: center; gap: 1rem; width: 90%; max-width: 400px; }
+        .adjustment-row label { width: 60px; text-align: left; }
+        .adjustment-row input { flex-grow: 1; }
+
+        .file-input-label { border-radius: 12px; padding: 0.75rem 1.5rem; background-color: var(--accent-color); color: black; font-weight: 600; }
+        .file-input-label:hover { box-shadow: 0 0 20px var(--accent-color); }
+        input[type=file] { display: none; }
+    </style>
+</head>
+<body>
+    <div class="starfield"></div>
+    <div id="vr-container">
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <video id="video" loop playsinline crossOrigin="anonymous"></video>
+    <img id="image" crossOrigin="anonymous">
+    
+    <div id="controls">
+        <div id="playback-controls" class="control-row">
+             <button id="btn-play-pause" class="control-btn">
+                <svg id="icon-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>
+                <svg id="icon-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"></path></svg>
+            </button>
+            <span id="time-current" class="time-display">00:00</span>
+            <input type="range" id="seek-bar" value="0" min="0" max="100" step="0.1">
+            <span id="time-duration" class="time-display">00:00</span>
+            <button id="btn-mute" class="control-btn">
+                <svg id="icon-volume-high" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"></path></svg>
+                <svg id="icon-volume-mute" viewBox="0 0 24 24" fill="currentColor" style="display:none;"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"></path></svg>
+            </button>
+            <input type="range" id="volume-slider" value="1" min="0" max="1" step="0.01">
+        </div>
+        <div class="control-row">
+            <label for="file-input" class="file-input-label text-btn">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"></path></svg>
+                <span class="ml-2">Select</span>
+            </label>
+            <input type="file" id="file-input" accept="video/*,image/*">
+            <div class="mode-group">
+                <button id="btn-flat" class="text-btn mode-btn">Flat</button>
+                <button id="btn-180" class="text-btn mode-btn active">180°</button>
+                <button id="btn-200" class="text-btn mode-btn">200°</button>
+                <button id="btn-fisheye" class="text-btn mode-btn">Fisheye</button>
+            </div>
+            <button id="btn-stereo" class="control-btn text-btn">Mono</button>
+            <button id="btn-controls" class="control-btn text-btn">Gyro</button>
+            <button id="btn-adjust" class="control-btn">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"></path></svg>
+            </button>
+            <button id="btn-fullscreen" class="control-btn">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"></path></svg>
+            </button>
+        </div>
+    </div>
+    
+    <div id="welcome-message" class="overlay">
+        <h1 class="text-4xl font-semibold mb-4 text-white">VR Web Player</h1>
+        <p class="mb-8 max-w-lg">For an immersive experience, use a mobile device and grant motion sensor access when prompted.</p>
+        <label for="file-input-welcome" class="file-input-label">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"></path></svg>
+            <span class="ml-2">Select Media File</span>
+        </label>
+        <input type="file" id="file-input-welcome" accept="video/*,image/*">
+    </div>
+
+    <div id="error-message" class="overlay"></div>
+
+    <div id="adjustments-panel" class="overlay">
+        <div class="adjustment-row">
+            <label for="zoom-slider">Zoom</label>
+            <input type="range" id="zoom-slider" min="30" max="120" value="75" step="1">
+        </div>
+        <div class="adjustment-row">
+            <label for="tilt-slider">Tilt</label>
+            <input type="range" id="tilt-slider" min="-0.5" max="0.5" value="0" step="0.01">
+        </div>
+        <div class="adjustment-row">
+            <label for="height-slider">Height</label>
+            <input type="range" id="height-slider" min="-1" max="1" value="0" step="0.01">
+        </div>
+        <button id="btn-close-adjustments" class="control-btn text-btn active" style="border-radius: 12px; padding: 0.75rem 1.5rem;">Close</button>
+    </div>
+
+    <script>
+        const container = document.getElementById('vr-container');
+        const canvas = document.getElementById('canvas');
+        const video = document.getElementById('video');
+        const image = document.getElementById('image');
+        const errorMessage = document.getElementById('error-message');
+        const controlsContainer = document.getElementById('controls');
+        const playbackControls = document.getElementById('playback-controls');
+        const adjustmentsPanel = document.getElementById('adjustments-panel');
+        
+        let scene, camera, renderer, mesh, texture;
+        let gyroControls, orbitControls, controls;
+        let stereoCamera, currentFileURL, controlsTimeout;
+        let currentProjection = 180; 
+        let stereoMode = 'mono'; // 'mono', 'sbs', 'ou'
+        let controlMode = 'gyro';
+        let gyroAvailable = false, permissionRequested = false;
+
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 0, 0.1);
+            stereoCamera = new THREE.StereoCamera();
+            renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            texture = new THREE.VideoTexture(video);
+            
+            setupDeviceControls();
+            updateProjection();
+            
+            video.addEventListener('error', () => showError("Unsupported format. Try converting to MP4."));
+            animate();
+            setupEventListeners();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (controls && controls.enabled) controls.update();
+            renderScene();
+        }
+
+        function renderScene() {
+            const currentTexture = mesh ? mesh.material.map : null;
+            if (!currentTexture) {
+                renderer.render(scene, camera);
+                return;
+            }
+
+            if (stereoMode !== 'mono') {
+                const size = renderer.getSize(new THREE.Vector2());
+                stereoCamera.update(camera);
+                renderer.setScissorTest(true);
+
+                // Left Eye
+                if (stereoMode === 'sbs') {
+                    currentTexture.repeat.x = 0.5; currentTexture.offset.x = 0;
+                } else { // ou
+                    currentTexture.repeat.y = 0.5; currentTexture.offset.y = 0.5;
+                }
+                renderer.setScissor(0, 0, size.width / 2, size.height);
+                renderer.setViewport(0, 0, size.width / 2, size.height);
+                renderer.render(scene, stereoCamera.cameraL);
+
+                // Right Eye
+                if (stereoMode === 'sbs') {
+                    currentTexture.offset.x = 0.5;
+                } else { // ou
+                    currentTexture.offset.y = 0;
+                }
+                renderer.setScissor(size.width / 2, 0, size.width / 2, size.height);
+                renderer.setViewport(size.width / 2, 0, size.width / 2, size.height);
+                renderer.render(scene, stereoCamera.cameraR);
+                
+                renderer.setScissorTest(false);
+                currentTexture.repeat.set(1, 1);
+                currentTexture.offset.set(0, 0);
+
+            } else {
+                if (currentTexture.repeat.x !== 1 || currentTexture.repeat.y !== 1) {
+                    currentTexture.repeat.set(1, 1);
+                    currentTexture.offset.set(0, 0);
+                }
+                renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+                renderer.render(scene, camera);
+            }
+        }
+
+        function updateProjection() {
+            if (mesh) {
+                scene.remove(mesh);
+                mesh.geometry.dispose();
+            }
+            const material = new THREE.MeshBasicMaterial({ map: texture });
+
+            if (currentProjection === 'flat') {
+                const mediaAspectRatio = (video.videoHeight || image.height) > 0 ? (video.videoWidth || image.width) / (video.videoHeight || image.height) : 16/9;
+                const planeHeight = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+                const planeWidth = planeHeight * mediaAspectRatio;
+                const geometry = new THREE.PlaneGeometry(planeWidth, planeHeight);
+                mesh = new THREE.Mesh(geometry, material);
+                mesh.position.z = -1;
+            } else {
+                const projectionAngle = currentProjection === 'fisheye' ? 360 : parseInt(currentProjection);
+                const phiLength = THREE.MathUtils.degToRad(projectionAngle);
+                const phiStart = -Math.PI / 2 - phiLength / 2;
+                const geometry = new THREE.SphereGeometry(500, 60, 40, phiStart, phiLength, 0, Math.PI);
+                geometry.scale(-1, 1, 1);
+                mesh = new THREE.Mesh(geometry, material);
+            }
+            scene.add(mesh);
+            applyAdjustments();
+            updateActiveController();
+        }
+        
+        function applyAdjustments() {
+            if (!mesh) return;
+            // Apply Tilt and Height from sliders
+            const tilt = parseFloat(document.getElementById('tilt-slider').value);
+            const height = parseFloat(document.getElementById('height-slider').value);
+            mesh.rotation.x = tilt;
+            mesh.position.y = height;
+            // Apply Zoom from slider
+            const zoom = parseFloat(document.getElementById('zoom-slider').value);
+            camera.fov = zoom;
+            camera.updateProjectionMatrix();
+        }
+
+        async function requestGyroPermission() {
+             if (permissionRequested) return true;
+             if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                permissionRequested = true;
+                try {
+                    const permissionState = await DeviceOrientationEvent.requestPermission();
+                    return permissionState === 'granted';
+                } catch (error) { return false; }
+            }
+            return true;
+        }
+
+        function setupDeviceControls() {
+            orbitControls = new THREE.OrbitControls(camera, renderer.domElement);
+            orbitControls.enableZoom = false; orbitControls.enablePan = false; orbitControls.rotateSpeed = -0.25;
+
+            if (window.DeviceOrientationEvent && typeof THREE.DeviceOrientationControls === 'function') {
+                gyroAvailable = true;
+                gyroControls = new THREE.DeviceOrientationControls(camera);
+            } else {
+                gyroAvailable = false; controlMode = 'drag';
+                document.getElementById('btn-controls').disabled = true;
+            }
+            updateActiveController();
+        }
+
+        function updateActiveController() {
+            const btn = document.getElementById('btn-controls');
+            const isVrMode = currentProjection !== 'flat';
+            if (controlMode === 'gyro' && gyroAvailable) {
+                controls = gyroControls; orbitControls.enabled = false;
+                btn.textContent = 'Gyro'; btn.classList.add('active');
+            } else {
+                controls = orbitControls; if (gyroControls) gyroControls.enabled = false;
+                btn.textContent = 'Drag'; btn.classList.remove('active');
+            }
+            if (controls) controls.enabled = isVrMode;
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.opacity = '1';
+            setTimeout(() => errorMessage.style.opacity = '0', 5000);
+        }
+
+        function setupEventListeners() {
+            // Playback... (omitted for brevity, no changes here)
+            const playPauseBtn = document.getElementById('btn-play-pause');
+            const iconPlay = document.getElementById('icon-play');
+            const iconPause = document.getElementById('icon-pause');
+            const seekBar = document.getElementById('seek-bar');
+            const currentTimeEl = document.getElementById('time-current');
+            const durationEl = document.getElementById('time-duration');
+            const muteBtn = document.getElementById('btn-mute');
+            const iconVolumeHigh = document.getElementById('icon-volume-high');
+            const iconVolumeMute = document.getElementById('icon-volume-mute');
+            const volumeSlider = document.getElementById('volume-slider');
+
+            const togglePlayPause = () => video.paused ? video.play() : video.pause();
+            playPauseBtn.addEventListener('click', togglePlayPause);
+            canvas.addEventListener('click', () => { if (playbackControls.style.display !== 'none' && !controlsContainer.classList.contains('controls-hidden')) { togglePlayPause(); } });
+            video.addEventListener('play', () => { iconPlay.style.display = 'none'; iconPause.style.display = 'block'; });
+            video.addEventListener('pause', () => { iconPlay.style.display = 'block'; iconPause.style.display = 'none'; });
+            const formatTime = (time) => { if (isNaN(time)) return '00:00'; const m = Math.floor(time / 60); const s = Math.floor(time % 60); return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`; };
+            video.addEventListener('loadedmetadata', () => durationEl.textContent = formatTime(video.duration));
+            video.addEventListener('timeupdate', () => { if (isFinite(video.duration)) seekBar.value = (video.currentTime / video.duration) * 100; currentTimeEl.textContent = formatTime(video.currentTime); });
+            seekBar.addEventListener('input', () => { if(isFinite(video.duration)) video.currentTime = (seekBar.value / 100) * video.duration; });
+            muteBtn.addEventListener('click', () => video.muted = !video.muted);
+            volumeSlider.addEventListener('input', (e) => { video.volume = e.target.value; video.muted = e.target.value == 0; });
+            video.addEventListener('volumechange', () => { volumeSlider.value = video.muted ? 0 : video.volume; iconVolumeHigh.style.display = (video.muted || video.volume === 0) ? 'none' : 'block'; iconVolumeMute.style.display = (video.muted || video.volume === 0) ? 'block' : 'none'; });
+            
+            // UI Controls
+            const showControls = () => {
+                controlsContainer.classList.remove('controls-hidden');
+                clearTimeout(controlsTimeout);
+                if (!video.paused) {
+                    controlsTimeout = setTimeout(() => controlsContainer.classList.add('controls-hidden'), 3000);
+                }
+            };
+            container.addEventListener('mousemove', showControls);
+            container.addEventListener('click', (e) => {
+                if(e.target === container || e.target === canvas) showControls();
+            });
+            showControls();
+
+            // File Handling
+            const fileInputs = [document.getElementById('file-input'), document.getElementById('file-input-welcome')];
+            fileInputs.forEach(input => input.addEventListener('change', handleFileSelect));
+            function handleFileSelect(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                if (currentFileURL) URL.revokeObjectURL(currentFileURL);
+                currentFileURL = URL.createObjectURL(file);
+                if (mesh && mesh.material.map) mesh.material.map.dispose();
+
+                if (file.type.startsWith('video/')) {
+                    playbackControls.style.display = 'flex';
+                    video.src = currentFileURL;
+                    video.play().catch(e => showError("Auto-play failed. Please click to play."));
+                    texture = new THREE.VideoTexture(video);
+                } else if (file.type.startsWith('image/')) {
+                    playbackControls.style.display = 'none';
+                    video.pause(); video.src = '';
+                    texture = new THREE.TextureLoader().load(currentFileURL, () => {
+                        if (currentProjection === 'flat') updateProjection();
+                    });
+                } else { showError("Unsupported file type."); return; }
+                if (mesh) mesh.material.map = texture;
+                document.getElementById('welcome-message').style.display = 'none';
+            }
+
+            // Mode Buttons
+            document.querySelectorAll('.mode-btn').forEach(button => {
+                button.addEventListener('click', () => {
+                    document.querySelector('.mode-btn.active').classList.remove('active');
+                    button.classList.add('active');
+                    const newProjection = button.id.replace('btn-', '');
+                    currentProjection = isNaN(parseInt(newProjection)) ? newProjection : parseInt(newProjection);
+                    updateProjection();
+                });
+            });
+            
+            // Stereo Mode Cycling
+            const stereoBtn = document.getElementById('btn-stereo');
+            stereoBtn.addEventListener('click', (e) => {
+                const modes = ['mono', 'sbs', 'ou'];
+                const currentModeIndex = modes.indexOf(stereoMode);
+                stereoMode = modes[(currentModeIndex + 1) % modes.length];
+                stereoBtn.textContent = stereoMode.toUpperCase();
+                stereoBtn.classList.toggle('active', stereoMode !== 'mono');
+                onWindowResize(); // Aspect ratio changes with stereo mode
+            });
+
+            document.getElementById('btn-controls').addEventListener('click', async () => {
+                if (!gyroAvailable) return;
+                if (controlMode === 'drag') {
+                    if (await requestGyroPermission()) controlMode = 'gyro';
+                    else showError("Gyroscope permission denied.");
+                } else { controlMode = 'drag'; }
+                updateActiveController();
+            });
+
+            // Adjustments Panel
+            document.getElementById('btn-adjust').addEventListener('click', () => adjustmentsPanel.style.display = 'flex');
+            document.getElementById('btn-close-adjustments').addEventListener('click', () => adjustmentsPanel.style.display = 'none');
+            document.getElementById('zoom-slider').addEventListener('input', applyAdjustments);
+            document.getElementById('tilt-slider').addEventListener('input', applyAdjustments);
+            document.getElementById('height-slider').addEventListener('input', applyAdjustments);
+
+
+            document.getElementById('btn-fullscreen').addEventListener('click', () => {
+                if (document.fullscreenElement) document.exitFullscreen();
+                else container.requestFullscreen();
+            });
+            window.addEventListener('resize', onWindowResize, false);
+        }
+        
+        function onWindowResize() {
+            const width = window.innerWidth, height = window.innerHeight;
+            const aspect = (stereoMode === 'mono') ? width / height : (width / 2) / height;
+            camera.aspect = aspect;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        }
+        
+        init();
+    </script>
+</body>
+</html>
+
